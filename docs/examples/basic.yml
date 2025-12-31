@@ -1,0 +1,15 @@
+# Basic usage example for Python Quality Orb
+
+version: 2.1
+
+orbs:
+  python-quality: branchbutler-labs/python-quality@1.0.0
+
+workflows:
+  code-quality:
+    jobs:
+      - python-quality/code-quality:
+          context: branchbutler
+          filters:
+            branches:
+              ignore: main

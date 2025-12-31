@@ -1,0 +1,55 @@
+# Custom job using individual commands
+
+version: 2.1
+
+orbs:
+  python-quality: branchbutler-labs/python-quality@1.0.0
+
+jobs:
+  my-custom-quality-check:
+    executor:
+      name: python-quality/python
+      tag: "3.11"
+      resource-class: "medium"
+    steps:
+      - checkout
+
+      # Install project dependencies
+      - run:
+          name: Install dependencies
+          command: |
+            pip install -r requirements.txt
+            pip install -r requirements-dev.txt
+
+      # Format code with custom settings
+      - python-quality/format:
+          line-length: 120
+          auto-commit: false
+          paths: "src tests"
+
+      # Run selective linting
+      - python-quality/lint:
+          run-pylint: true
+          run-flake8: true
+          run-mypy: true
+          run-bandit: false
+          fail-on-error: false
+          max-line-length: 120
+
+      # Run tests
+      - run:
+          name: Run tests
+          command: |
+            pytest --cov=src --cov-report=xml --cov-report=term
+
+      # Upload coverage
+      - run:
+          name: Upload coverage
+          command: |
+            bash <(curl -s https://codecov.io/bash)
+
+workflows:
+  custom-workflow:
+    jobs:
+      - my-custom-quality-check:
+          context: branchbutler

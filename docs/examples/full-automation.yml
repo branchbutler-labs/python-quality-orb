@@ -1,0 +1,44 @@
+# Full PR automation workflow with formatting, linting, and review
+
+version: 2.1
+
+orbs:
+  python-quality: branchbutler-labs/python-quality@1.0.0
+
+workflows:
+  pr-automation:
+    jobs:
+      # Step 1: Auto-format code and commit changes
+      - python-quality/code-quality:
+          name: auto-format
+          run-format: true
+          run-lint: false
+          auto-commit: true
+          line-length: 100
+          context: branchbutler
+          filters:
+            branches:
+              ignore: main
+
+      # Step 2: Run comprehensive linting
+      - python-quality/code-quality:
+          name: lint-check
+          run-format: false
+          run-lint: true
+          requires:
+            - auto-format
+          context: branchbutler
+          filters:
+            branches:
+              ignore: main
+
+      # Step 3: Automated PR review
+      - python-quality/pr-review:
+          name: danger-review
+          min-coverage: 80
+          requires:
+            - lint-check
+          context: branchbutler
+          filters:
+            branches:
+              ignore: main

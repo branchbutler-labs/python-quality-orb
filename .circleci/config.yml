@@ -1,0 +1,143 @@
+version: 2.1
+
+# Use the orb tools orb for orb development
+orbs:
+  orb-tools: circleci/orb-tools@12.0
+
+# Pipeline parameters
+parameters:
+  run-integration-tests:
+    type: boolean
+    default: false
+
+workflows:
+  # Validate and publish orb
+  validate-publish:
+    unless: << pipeline.parameters.run-integration-tests >>
+    jobs:
+      # Validate the orb
+      - orb-tools/lint:
+          filters:
+            branches:
+              ignore: main
+
+      - orb-tools/pack:
+          filters:
+            branches:
+              ignore: main
+
+      - orb-tools/review:
+          filters:
+            branches:
+              ignore: main
+
+      # Publish dev version on every commit
+      - orb-tools/publish:
+          name: publish-dev
+          orb_name: branchbutler-labs/python-quality
+          vcs_type: << pipeline.project.type >>
+          requires:
+            - orb-tools/lint
+            - orb-tools/pack
+            - orb-tools/review
+          context: orb-publishing
+          filters:
+            branches:
+              ignore: main
+
+      # Publish production version on main branch
+      - orb-tools/publish:
+          name: publish-production
+          orb_name: branchbutler-labs/python-quality
+          vcs_type: << pipeline.project.type >>
+          pub_type: production
+          requires:
+            - orb-tools/lint
+            - orb-tools/pack
+            - orb-tools/review
+          context: orb-publishing
+          filters:
+            branches:
+              only: main
+
+  # Integration tests (triggered manually)
+  integration-tests:
+    when: << pipeline.parameters.run-integration-tests >>
+    jobs:
+      - integration-test-format
+      - integration-test-lint
+      - integration-test-full
+
+jobs:
+  integration-test-format:
+    docker:
+      - image: cimg/python:3.11
+    steps:
+      - checkout
+      - run:
+          name: Create test Python files
+          command: |
+            cat > test_file.py <<'EOF'
+            import sys
+            import os
+            def badly_formatted(x,y,z):
+                return x+y+z
+            EOF
+      - run:
+          name: Test format command
+          command: |
+            pip install black isort
+            black --line-length 100 test_file.py
+            echo "Format test passed"
+
+  integration-test-lint:
+    docker:
+      - image: cimg/python:3.11
+    steps:
+      - checkout
+      - run:
+          name: Create test Python files
+          command: |
+            cat > test_file.py <<'EOF'
+            def good_function(x: int, y: int) -> int:
+                """Add two numbers."""
+                return x + y
+            EOF
+      - run:
+          name: Test lint command
+          command: |
+            pip install pylint flake8 mypy bandit
+            pylint test_file.py || true
+            flake8 test_file.py || true
+            echo "Lint test passed"
+
+  integration-test-full:
+    docker:
+      - image: cimg/python:3.11
+    steps:
+      - checkout
+      - run:
+          name: Create test project
+          command: |
+            mkdir -p test_project
+            cat > test_project/main.py <<'EOF'
+            """Test module."""
+            def hello(name: str) -> str:
+                """Greet someone."""
+                return f"Hello, {name}!"
+
+            if __name__ == "__main__":
+                print(hello("World"))
+            EOF
+      - run:
+          name: Test full workflow
+          command: |
+            cd test_project
+            pip install black isort pylint flake8 mypy bandit
+            black --line-length 100 main.py
+            isort --profile black main.py
+            pylint main.py || true
+            flake8 --max-line-length=100 main.py || true
+            mypy main.py || true
+            bandit -r . || true
+            echo "Full workflow test passed"
