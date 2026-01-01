@@ -1,0 +1,13 @@
+version: 2.1
+
+orbs:
+  python-quality: branchbutler-labs/python-quality@dev:alpha
+
+workflows:
+  test-orb:
+    jobs:
+      - python-quality/code-quality:
+          name: test-format-and-lint
+          run-format: true
+          run-lint: true
+          line-length: 100
