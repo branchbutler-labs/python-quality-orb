@@ -1,0 +1,101 @@
+version: 2.1
+
+# This config is used for testing the orb with orb-tools
+
+orbs:
+  python-quality: branchbutler-labs/python-quality@dev:${CIRCLE_SHA1:0:7}
+  orb-tools: circleci/orb-tools@12.0
+
+filters: &filters
+  tags:
+    only: /.*/
+
+workflows:
+  test-deploy:
+    jobs:
+      # Test format command
+      - python-quality/code-quality:
+          name: test-format-only
+          run-format: true
+          run-lint: false
+          auto-commit: false
+          filters: *filters
+          context: orb-publishing
+
+      # Test lint command
+      - python-quality/code-quality:
+          name: test-lint-only
+          run-format: false
+          run-lint: true
+          filters: *filters
+          context: orb-publishing
+
+      # Test full code quality
+      - python-quality/code-quality:
+          name: test-full-quality
+          run-format: true
+          run-lint: true
+          auto-commit: false
+          line-length: 100
+          filters: *filters
+          context: orb-publishing
+
+      # Test PR review job
+      - python-quality/pr-review:
+          name: test-pr-review
+          min-coverage: 80
+          filters: *filters
+          context: orb-publishing
+
+      # Test with custom executor
+      - test-custom-executor:
+          filters: *filters
+
+      # Test individual commands
+      - test-individual-commands:
+          filters: *filters
+
+jobs:
+  test-custom-executor:
+    executor:
+      name: python-quality/python
+      tag: "3.10"
+      resource-class: "small"
+    steps:
+      - checkout
+      - run:
+          name: Verify Python version
+          command: |
+            python --version | grep "3.10"
+            echo "✅ Python 3.10 executor working"
+
+  test-individual-commands:
+    executor: python-quality/python
+    steps:
+      - checkout
+      - run:
+          name: Create test Python file
+          command: |
+            cat > test_sample.py \<<'EOF'
+            import sys
+            import os
+            def example(x,y):
+                return x+y
+            EOF
+      - python-quality/format:
+          line-length: 100
+          auto-commit: false
+          paths: "test_sample.py"
+      - python-quality/lint:
+          fail-on-error: false
+          paths: "test_sample.py"
+      - run:
+          name: Verify formatting was applied
+          command: |
+            if grep -q "def example(x, y):" test_sample.py; then
+              echo "✅ Formatting applied correctly"
+            else
+              echo "❌ Formatting not applied"
+              cat test_sample.py
+              exit 1
+            fi

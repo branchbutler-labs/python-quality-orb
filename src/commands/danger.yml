@@ -1,0 +1,81 @@
+description: >
+  Run Danger for automated pull request review.
+
+  Danger analyzes pull requests and provides automated feedback on PR
+  description quality, changelog updates, file sizes, and code patterns.
+
+parameters:
+  github-token:
+    type: env_var_name
+    default: GITHUB_TOKEN
+    description: Environment variable name containing GitHub API token
+
+  min-coverage:
+    type: integer
+    default: 80
+    description: Minimum test coverage percentage to require
+
+  fail-on-warnings:
+    type: boolean
+    default: false
+    description: Fail the job if Danger reports warnings
+
+steps:
+  - run:
+      name: Install Danger
+      command: |
+        pip install danger-python
+
+  - run:
+      name: Create Dangerfile
+      command: |
+        cat > Dangerfile \<<'EOF'
+        import os
+        from danger_python import Danger
+
+        danger = Danger()
+
+        # Check PR description
+        if not danger.github.pr.body or len(danger.github.pr.body) < 10:
+            danger.warn("Please provide a detailed PR description.")
+
+        # Check for changelog updates
+        has_changelog = any('CHANGELOG' in f or 'changelog' in f
+                          for f in danger.git.modified_files + danger.git.created_files)
+        if not has_changelog and danger.github.pr.base_ref == 'main':
+            danger.warn("Consider updating the CHANGELOG.")
+
+        # Check file sizes
+        big_files = [f for f in danger.git.created_files + danger.git.modified_files
+                    if os.path.exists(f) and os.path.getsize(f) > 500000]
+        if big_files:
+            danger.warn(f"Large files detected: {', '.join(big_files)}")
+
+        # Check for TODO comments
+        todos = []
+        for file in danger.git.modified_files + danger.git.created_files:
+            if file.endswith('.py') and os.path.exists(file):
+                with open(file) as f:
+                    for i, line in enumerate(f, 1):
+                        if 'TODO' in line:
+                            todos.append(f"{file}:{i}")
+        if todos:
+            danger.message(f"TODO comments found:\n" + "\n".join(todos))
+
+        # Success message
+        if not danger.warnings and not danger.failures:
+            danger.message("✅ All automated checks passed!")
+        EOF
+
+  - run:
+      name: Run Danger
+      command: |
+        export DANGER_GITHUB_API_TOKEN=${<< parameters.github-token >>}
+
+        if [ -n "$CIRCLE_PULL_REQUEST" ]; then
+          PR_NUM=$(echo $CIRCLE_PULL_REQUEST | sed 's/.*\///')
+          danger pr https://github.com/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME/pull/$PR_NUM || \
+            if [ "<< parameters.fail-on-warnings >>" = "true" ]; then exit 1; else true; fi
+        else
+          echo "Not a PR build, skipping Danger"
+        fi

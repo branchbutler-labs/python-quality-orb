@@ -1,0 +1,89 @@
+description: >
+  Run comprehensive Python linting and static analysis.
+
+  Executes multiple linters including pylint, flake8, mypy, and bandit to
+  ensure code quality, style compliance, type safety, and security.
+
+parameters:
+  fail-on-error:
+    type: boolean
+    default: true
+    description: Fail the job if linting errors are found
+
+  run-pylint:
+    type: boolean
+    default: true
+    description: Run pylint for code quality checks
+
+  run-flake8:
+    type: boolean
+    default: true
+    description: Run flake8 for style guide enforcement
+
+  run-mypy:
+    type: boolean
+    default: true
+    description: Run mypy for static type checking
+
+  run-bandit:
+    type: boolean
+    default: true
+    description: Run bandit for security vulnerability scanning
+
+  max-line-length:
+    type: integer
+    default: 100
+    description: Maximum line length for linters
+
+  paths:
+    type: string
+    default: "."
+    description: Paths to lint (space-separated)
+
+steps:
+  - run:
+      name: Install linters
+      command: |
+        pip install pylint flake8 mypy bandit
+
+  - when:
+      condition: << parameters.run-pylint >>
+      steps:
+        - run:
+            name: Run pylint
+            command: |
+              echo "Running pylint..."
+              pylint --max-line-length=<< parameters.max-line-length >> \
+                --output-format=colorized \
+                $(find << parameters.paths >> -name "*.py" | grep -v __pycache__ | head -20) || \
+                if [ "<< parameters.fail-on-error >>" = "true" ]; then exit 1; else true; fi
+
+  - when:
+      condition: << parameters.run-flake8 >>
+      steps:
+        - run:
+            name: Run flake8
+            command: |
+              echo "Running flake8..."
+              flake8 --max-line-length=<< parameters.max-line-length >> << parameters.paths >> || \
+                if [ "<< parameters.fail-on-error >>" = "true" ]; then exit 1; else true; fi
+
+  - when:
+      condition: << parameters.run-mypy >>
+      steps:
+        - run:
+            name: Run mypy
+            command: |
+              echo "Running mypy type checking..."
+              mypy << parameters.paths >> || \
+                if [ "<< parameters.fail-on-error >>" = "true" ]; then exit 1; else true; fi
+
+  - when:
+      condition: << parameters.run-bandit >>
+      steps:
+        - run:
+            name: Run bandit security checks
+            command: |
+              echo "Running bandit security analysis..."
+              bandit -r << parameters.paths >> -f screen || \
+                if [ "<< parameters.fail-on-error >>" = "true" ]; then exit 1; else true; fi

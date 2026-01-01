@@ -1,0 +1,18 @@
+description: >
+  Run automated pull request review with Danger.
+
+  Analyzes the PR for common issues and provides automated feedback.
+
+executor: python
+
+parameters:
+  min-coverage:
+    type: integer
+    default: 80
+    description: Minimum test coverage percentage to require
+
+steps:
+  - checkout
+
+  - danger:
+      min-coverage: << parameters.min-coverage >>

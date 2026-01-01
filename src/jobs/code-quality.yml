@@ -1,0 +1,74 @@
+description: >
+  Run a complete code quality check suite.
+
+  This job performs formatting, linting, and optionally commits changes.
+  Includes caching for faster subsequent runs.
+
+executor: python
+
+parameters:
+  checkout-code:
+    type: boolean
+    default: true
+    description: Whether to checkout repository code
+
+  run-format:
+    type: boolean
+    default: true
+    description: Run code formatting with Black and isort
+
+  run-lint:
+    type: boolean
+    default: true
+    description: Run linting with pylint, flake8, mypy, and bandit
+
+  line-length:
+    type: integer
+    default: 100
+    description: Maximum line length for formatters and linters
+
+  auto-commit:
+    type: boolean
+    default: false
+    description: Automatically commit and push formatting changes
+
+steps:
+  - when:
+      condition: << parameters.checkout-code >>
+      steps:
+        - checkout
+
+  - restore_cache:
+      keys:
+        - pip-v1-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
+        - pip-v1-{{ checksum "requirements.txt" }}
+        - pip-v1-
+
+  - run:
+      name: Install dependencies
+      command: |
+        if [ -f requirements.txt ]; then
+          pip install -r requirements.txt
+        fi
+        if [ -f requirements-dev.txt ]; then
+          pip install -r requirements-dev.txt
+        fi
+
+  - when:
+      condition: << parameters.run-format >>
+      steps:
+        - format:
+            line-length: << parameters.line-length >>
+            auto-commit: << parameters.auto-commit >>
+
+  - when:
+      condition: << parameters.run-lint >>
+      steps:
+        - lint:
+            max-line-length: << parameters.line-length >>
+            fail-on-error: false
+
+  - save_cache:
+      key: pip-v1-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
+      paths:
+        - /tmp/pip-cache

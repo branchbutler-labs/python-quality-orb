@@ -1,0 +1,25 @@
+description: >
+  Python executor with pre-installed tools and optimized caching.
+
+parameters:
+  tag:
+    type: string
+    default: "3.11"
+    description: Python version tag (e.g., "3.11", "3.10", "3.9")
+
+  resource-class:
+    type: enum
+    enum: ["small", "medium", "medium+", "large"]
+    default: "medium"
+    description: Resource class for the executor
+
+docker:
+  - image: cimg/python:<< parameters.tag >>
+
+resource_class: << parameters.resource-class >>
+
+environment:
+  PYTHONUNBUFFERED: "1"
+  PIP_CACHE_DIR: "/tmp/pip-cache"
+
+working_directory: ~/project

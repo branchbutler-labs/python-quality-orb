@@ -1,0 +1,73 @@
+description: >
+  Rebase the current branch onto a target branch.
+
+  Performs a git rebase with optional automatic conflict resolution for
+  common scenarios. Useful for keeping feature branches up to date.
+
+parameters:
+  base-branch:
+    type: string
+    default: "main"
+    description: Base branch to rebase onto
+
+  auto-resolve-conflicts:
+    type: boolean
+    default: false
+    description: Attempt to automatically resolve simple conflicts
+
+  force-push:
+    type: boolean
+    default: true
+    description: Force push the rebased branch (uses --force-with-lease for safety)
+
+steps:
+  - run:
+      name: Configure Git
+      command: |
+        git config user.email "bot@branchbutler.com"
+        git config user.name "Branch Butler Bot"
+
+  - run:
+      name: Fetch latest changes
+      command: |
+        git fetch origin << parameters.base-branch >>
+        echo "Fetched latest changes from << parameters.base-branch >>"
+
+  - run:
+      name: Rebase branch
+      command: |
+        echo "Rebasing onto origin/<< parameters.base-branch >>"
+
+        if git rebase origin/<< parameters.base-branch >>; then
+          echo "✅ Rebase successful"
+        else
+          if [ "<< parameters.auto-resolve-conflicts >>" = "true" ]; then
+            echo "Attempting to auto-resolve conflicts..."
+
+            # Accept ours for specific files
+            git checkout --ours pyproject.toml 2>/dev/null || true
+            git checkout --ours setup.py 2>/dev/null || true
+            git add -A
+
+            if git rebase --continue; then
+              echo "✅ Auto-resolution successful"
+            else
+              echo "❌ Manual conflict resolution required"
+              git rebase --abort
+              exit 1
+            fi
+          else
+            echo "❌ Rebase failed - manual resolution required"
+            git rebase --abort
+            exit 1
+          fi
+        fi
+
+  - when:
+      condition: << parameters.force-push >>
+      steps:
+        - run:
+            name: Force push rebased branch
+            command: |
+              git push --force-with-lease origin HEAD
+              echo "✅ Branch rebased and pushed"
