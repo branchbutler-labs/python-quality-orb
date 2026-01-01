@@ -27,10 +27,9 @@ parameters:
     description: isort profile to use (black, django, pycharm, google, open_stack, plone, attrs, hug)
 
 steps:
-  - run:
-      name: Install formatters
-      command: |
-        pip install black isort
+  - install-tools:
+      install-formatters: true
+      install-linters: false
 
   - run:
       name: Run Black formatter

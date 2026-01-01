@@ -1,0 +1,50 @@
+# Label configuration for actions/labeler
+
+# Component labels
+command:
+  - changed-files:
+      - any-glob-to-any-file: 'src/commands/**/*'
+
+job:
+  - changed-files:
+      - any-glob-to-any-file: 'src/jobs/**/*'
+
+executor:
+  - changed-files:
+      - any-glob-to-any-file: 'src/executors/**/*'
+
+# Type labels
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/*.md'
+          - 'docs/**/*'
+
+ci/cd:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.circleci/**/*'
+          - '.github/**/*'
+
+testing:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/test*'
+          - 'test-integration/**/*'
+          - '.circleci/test-deploy.yml'
+
+configuration:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.pre-commit-config.yaml'
+          - '.yamllint.yaml'
+          - '.secrets.baseline'
+
+# Orb core
+orb-core:
+  - changed-files:
+      - any-glob-to-any-file: 'src/@orb.yml'
+
+examples:
+  - changed-files:
+      - any-glob-to-any-file: 'docs/examples/**/*'

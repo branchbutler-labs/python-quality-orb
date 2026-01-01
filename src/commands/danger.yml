@@ -1,8 +1,16 @@
 description: >
-  Run Danger for automated pull request review.
+  Run comprehensive Danger-based PR automation.
 
-  Danger analyzes pull requests and provides automated feedback on PR
-  description quality, changelog updates, file sizes, and code patterns.
+  Provides automated PR review with:
+  - PR description validation
+  - Auto-labeling by file type and PR size
+  - Changelog enforcement
+  - Breaking change detection
+  - Commit message validation
+  - Large file warnings
+  - TODO tracking
+  - Test file requirements
+  - Documentation requirements
 
 parameters:
   github-token:
@@ -10,62 +18,396 @@ parameters:
     default: GITHUB_TOKEN
     description: Environment variable name containing GitHub API token
 
-  min-coverage:
+  min-description-length:
     type: integer
-    default: 80
-    description: Minimum test coverage percentage to require
+    default: 50
+    description: Minimum PR description length to require
+
+  max-file-size:
+    type: integer
+    default: 500000
+    description: Maximum file size in bytes before warning
 
   fail-on-warnings:
     type: boolean
     default: false
     description: Fail the job if Danger reports warnings
 
+  require-changelog:
+    type: boolean
+    default: true
+    description: Require CHANGELOG updates for PRs to main/master
+
+  require-tests:
+    type: boolean
+    default: false
+    description: Require test files when source files change
+
+  auto-label:
+    type: boolean
+    default: true
+    description: Automatically suggest labels based on changed files
+
+  check-commits:
+    type: boolean
+    default: true
+    description: Validate commit message format (conventional commits)
+
+  max-pr-size:
+    type: integer
+    default: 500
+    description: Maximum lines changed before warning about PR size
+
+  protected-branches:
+    type: string
+    default: "main,master"
+    description: Comma-separated list of protected branches requiring extra checks
+
 steps:
   - run:
-      name: Install Danger
+      name: Install Danger and dependencies
       command: |
-        pip install danger-python
+        pip install danger-python requests PyGithub
 
   - run:
-      name: Create Dangerfile
+      name: Create comprehensive Dangerfile
       command: |
-        cat > Dangerfile \<<'EOF'
+        cat > Dangerfile \<<'DANGERFILE_EOF'
+        """
+        Comprehensive Danger automation for Python Quality Orb.
+
+        Features:
+        - PR description validation
+        - Auto-labeling suggestions
+        - Changelog enforcement
+        - Breaking change detection
+        - Commit message validation
+        - Large file warnings
+        - TODO tracking
+        - Test coverage hints
+        - Documentation requirements
+        """
         import os
+        import re
+        from typing import List, Set, Dict, Any
         from danger_python import Danger
 
+        # Initialize Danger
         danger = Danger()
 
-        # Check PR description
-        if not danger.github.pr.body or len(danger.github.pr.body) < 10:
-            danger.warn("Please provide a detailed PR description.")
+        # Configuration from parameters
+        MIN_DESC_LENGTH = << parameters.min-description-length >>
+        MAX_FILE_SIZE = << parameters.max-file-size >>
+        REQUIRE_CHANGELOG = << parameters.require-changelog >>
+        REQUIRE_TESTS = << parameters.require-tests >>
+        AUTO_LABEL = << parameters.auto-label >>
+        CHECK_COMMITS = << parameters.check-commits >>
+        MAX_PR_SIZE = << parameters.max-pr-size >>
+        PROTECTED_BRANCHES = "<< parameters.protected-branches >>".split(",")
 
-        # Check for changelog updates
-        has_changelog = any('CHANGELOG' in f or 'changelog' in f
-                          for f in danger.git.modified_files + danger.git.created_files)
-        if not has_changelog and danger.github.pr.base_ref == 'main':
-            danger.warn("Consider updating the CHANGELOG.")
+        # Get all changed files
+        all_files = danger.git.modified_files + danger.git.created_files + danger.git.deleted_files
+        modified_files = danger.git.modified_files + danger.git.created_files
 
-        # Check file sizes
-        big_files = [f for f in danger.git.created_files + danger.git.modified_files
-                    if os.path.exists(f) and os.path.getsize(f) > 500000]
-        if big_files:
-            danger.warn(f"Large files detected: {', '.join(big_files)}")
+        # ============================================
+        # PR Description Validation
+        # ============================================
+        pr_body = danger.github.pr.body or ""
+        pr_title = danger.github.pr.title or ""
 
-        # Check for TODO comments
-        todos = []
-        for file in danger.git.modified_files + danger.git.created_files:
-            if file.endswith('.py') and os.path.exists(file):
-                with open(file) as f:
-                    for i, line in enumerate(f, 1):
-                        if 'TODO' in line:
-                            todos.append(f"{file}:{i}")
-        if todos:
-            danger.message(f"TODO comments found:\n" + "\n".join(todos))
+        if len(pr_body.strip()) < MIN_DESC_LENGTH:
+            danger.warn(
+                f"📝 **PR Description Too Short**\n\n"
+                f"Please provide a detailed PR description (minimum {MIN_DESC_LENGTH} characters).\n"
+                f"Current length: {len(pr_body.strip())} characters.\n\n"
+                f"A good PR description should explain:\n"
+                f"- What changes were made\n"
+                f"- Why these changes are needed\n"
+                f"- How to test the changes"
+            )
 
-        # Success message
-        if not danger.warnings and not danger.failures:
-            danger.message("✅ All automated checks passed!")
-        EOF
+        # Check for WIP/Draft indicators
+        wip_patterns = ['WIP', 'Work in Progress', 'DO NOT MERGE', 'Draft']
+        for pattern in wip_patterns:
+            if pattern.lower() in pr_title.lower():
+                danger.warn(f"🚧 This PR appears to be a work in progress ({pattern}). Please remove '{pattern}' from the title when ready.")
+
+        # ============================================
+        # Auto-Labeling Suggestions
+        # ============================================
+        if AUTO_LABEL:
+            suggested_labels: Set[str] = set()
+            label_reasons: Dict[str, List[str]] = {}
+
+            def add_label(label: str, reason: str):
+                suggested_labels.add(label)
+                if label not in label_reasons:
+                    label_reasons[label] = []
+                label_reasons[label].append(reason)
+
+            for file in all_files:
+                # Component labels
+                if file.startswith('src/commands/'):
+                    add_label('command', file)
+                elif file.startswith('src/jobs/'):
+                    add_label('job', file)
+                elif file.startswith('src/executors/'):
+                    add_label('executor', file)
+
+                # Type labels
+                if file.endswith('.md'):
+                    add_label('documentation', file)
+                if file.startswith('.circleci/') or file.startswith('.github/'):
+                    add_label('ci/cd', file)
+                if 'test' in file.lower():
+                    add_label('testing', file)
+
+                # Language labels
+                if file.endswith('.py'):
+                    add_label('python', file)
+                if file.endswith('.yml') or file.endswith('.yaml'):
+                    add_label('yaml', file)
+
+            # Size labels
+            additions = danger.github.pr.additions or 0
+            deletions = danger.github.pr.deletions or 0
+            total_changes = additions + deletions
+
+            if total_changes < 10:
+                add_label('size/XS', f'{total_changes} lines')
+            elif total_changes < 50:
+                add_label('size/S', f'{total_changes} lines')
+            elif total_changes < 200:
+                add_label('size/M', f'{total_changes} lines')
+            elif total_changes < 500:
+                add_label('size/L', f'{total_changes} lines')
+            else:
+                add_label('size/XL', f'{total_changes} lines')
+
+            if suggested_labels:
+                label_list = '\n'.join([f"- `{label}`: {', '.join(label_reasons[label][:3])}" for label in sorted(suggested_labels)])
+                danger.message(
+                    f"🏷️ **Suggested Labels**\n\n"
+                    f"{label_list}\n\n"
+                    f"_Consider adding these labels to help categorize this PR._"
+                )
+
+        # ============================================
+        # PR Size Check
+        # ============================================
+        additions = danger.github.pr.additions or 0
+        deletions = danger.github.pr.deletions or 0
+        total_changes = additions + deletions
+
+        if total_changes > MAX_PR_SIZE:
+            danger.warn(
+                f"📊 **Large PR Detected**\n\n"
+                f"This PR changes {total_changes} lines (+{additions}/-{deletions}).\n"
+                f"Consider breaking it into smaller, focused PRs for easier review.\n\n"
+                f"Large PRs are harder to review and more likely to have issues."
+            )
+
+        # ============================================
+        # Changelog Enforcement
+        # ============================================
+        if REQUIRE_CHANGELOG:
+            target_branch = danger.github.pr.base.ref
+            if target_branch in PROTECTED_BRANCHES:
+                has_changelog = any(
+                    'changelog' in f.lower()
+                    for f in modified_files
+                )
+
+                # Skip for docs-only PRs
+                is_docs_only = all(
+                    f.endswith('.md') or f.startswith('docs/')
+                    for f in modified_files
+                )
+
+                if not has_changelog and not is_docs_only:
+                    danger.warn(
+                        f"📋 **Changelog Update Required**\n\n"
+                        f"PRs to `{target_branch}` should include CHANGELOG.md updates.\n"
+                        f"Please add a brief description of your changes."
+                    )
+
+        # ============================================
+        # Breaking Change Detection
+        # ============================================
+        breaking_indicators = [
+            'BREAKING CHANGE',
+            'BREAKING:',
+            'breaking change',
+            '!:',  # Conventional commit breaking change
+        ]
+
+        is_breaking = any(
+            indicator in pr_body or indicator in pr_title
+            for indicator in breaking_indicators
+        )
+
+        # Check for removed parameters in orb files
+        deleted_params = []
+        for file in danger.git.modified_files:
+            if file.endswith('.yml') and file.startswith('src/'):
+                try:
+                    # Simple heuristic: look for removed parameter definitions
+                    # In a real implementation, you'd parse the YAML diff
+                    pass
+                except Exception:
+                    pass
+
+        if is_breaking:
+            danger.warn(
+                f"💥 **Breaking Change Detected**\n\n"
+                f"This PR contains breaking changes. Please ensure:\n"
+                f"- CHANGELOG.md documents the breaking change\n"
+                f"- Migration guide is provided if needed\n"
+                f"- Version bump follows semver (major version)\n"
+                f"- All dependent projects are considered"
+            )
+
+        # ============================================
+        # Commit Message Validation
+        # ============================================
+        if CHECK_COMMITS:
+            # Conventional commit pattern
+            commit_pattern = re.compile(
+                r'^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?: .{1,100}'
+            )
+
+            invalid_commits = []
+            commits = danger.git.commits
+
+            for commit in commits:
+                message = commit.message.split('\n')[0]  # First line only
+                if not commit_pattern.match(message):
+                    # Skip merge commits
+                    if not message.startswith('Merge'):
+                        invalid_commits.append(f"- `{message[:60]}...`" if len(message) > 60 else f"- `{message}`")
+
+            if invalid_commits:
+                danger.message(
+                    f"📝 **Commit Message Format**\n\n"
+                    f"These commits don't follow [Conventional Commits](https://www.conventionalcommits.org/):\n\n"
+                    f"{chr(10).join(invalid_commits[:5])}\n\n"
+                    f"Format: `type(scope): description`\n"
+                    f"Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert"
+                )
+
+        # ============================================
+        # Large File Detection
+        # ============================================
+        large_files = []
+        for file in modified_files:
+            if os.path.exists(file):
+                size = os.path.getsize(file)
+                if size > MAX_FILE_SIZE:
+                    large_files.append(f"- `{file}` ({size:,} bytes)")
+
+        if large_files:
+            danger.warn(
+                f"📦 **Large Files Detected**\n\n"
+                f"The following files exceed {MAX_FILE_SIZE:,} bytes:\n\n"
+                f"{chr(10).join(large_files)}\n\n"
+                f"Consider:\n"
+                f"- Using Git LFS for binary files\n"
+                f"- Compressing images\n"
+                f"- Splitting large files"
+            )
+
+        # ============================================
+        # Test File Requirements
+        # ============================================
+        if REQUIRE_TESTS:
+            source_files = [f for f in modified_files if f.endswith('.py') and 'test' not in f.lower()]
+            test_files = [f for f in modified_files if 'test' in f.lower()]
+
+            if source_files and not test_files:
+                danger.warn(
+                    f"🧪 **Tests Recommended**\n\n"
+                    f"Source files were modified but no test files were updated:\n\n"
+                    f"Modified source files:\n"
+                    f"{chr(10).join([f'- `{f}`' for f in source_files[:5]])}\n\n"
+                    f"Please consider adding or updating tests."
+                )
+
+        # ============================================
+        # TODO/FIXME Tracking
+        # ============================================
+        todos_found = []
+        fixmes_found = []
+
+        for file in modified_files:
+            if os.path.exists(file):
+                try:
+                    with open(file, 'r', encoding='utf-8', errors='ignore') as f:
+                        for i, line in enumerate(f, 1):
+                            if 'TODO' in line:
+                                todos_found.append(f"- `{file}:{i}`: {line.strip()[:80]}")
+                            if 'FIXME' in line:
+                                fixmes_found.append(f"- `{file}:{i}`: {line.strip()[:80]}")
+                except Exception:
+                    pass
+
+        if todos_found or fixmes_found:
+            message_parts = []
+            if todos_found:
+                message_parts.append(f"**TODOs ({len(todos_found)}):**\n" + chr(10).join(todos_found[:5]))
+            if fixmes_found:
+                message_parts.append(f"**FIXMEs ({len(fixmes_found)}):**\n" + chr(10).join(fixmes_found[:5]))
+
+            danger.message(
+                f"📌 **Action Items Found**\n\n"
+                f"{chr(10).join(message_parts)}\n\n"
+                f"_Consider addressing these before merging or create issues to track them._"
+            )
+
+        # ============================================
+        # Security Sensitive Files
+        # ============================================
+        security_files = ['.env', 'secrets', 'credentials', 'password', 'api_key', 'token']
+        sensitive_found = []
+
+        for file in all_files:
+            file_lower = file.lower()
+            for pattern in security_files:
+                if pattern in file_lower:
+                    sensitive_found.append(file)
+                    break
+
+        if sensitive_found:
+            danger.fail(
+                f"🔐 **Security Review Required**\n\n"
+                f"Files with potentially sensitive names detected:\n\n"
+                f"{chr(10).join([f'- `{f}`' for f in sensitive_found])}\n\n"
+                f"Please ensure no secrets are being committed."
+            )
+
+        # ============================================
+        # Documentation Requirements
+        # ============================================
+        readme_updated = any('readme' in f.lower() for f in modified_files)
+        source_changed = any(f.startswith('src/') for f in modified_files)
+
+        if source_changed and not readme_updated:
+            danger.message(
+                f"📚 **Documentation Reminder**\n\n"
+                f"Source files were modified. If you added new features or changed behavior, "
+                f"please update the README.md accordingly."
+            )
+
+        # ============================================
+        # Final Summary
+        # ============================================
+        if not danger.warnings and not danger.fails:
+            danger.message(
+                f"✅ **All Automated Checks Passed!**\n\n"
+                f"Great job! This PR looks good from an automated perspective.\n"
+                f"- {len(modified_files)} files changed\n"
+                f"- +{additions}/-{deletions} lines"
+            )
+        DANGERFILE_EOF
 
   - run:
       name: Run Danger
@@ -77,5 +419,6 @@ steps:
           danger pr https://github.com/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME/pull/$PR_NUM || \
             if [ "<< parameters.fail-on-warnings >>" = "true" ]; then exit 1; else true; fi
         else
-          echo "Not a PR build, skipping Danger"
+          echo "ℹ️ Not a PR build, skipping Danger"
+          echo "To test locally, set CIRCLE_PULL_REQUEST environment variable"
         fi

@@ -1,0 +1,80 @@
+# Pre-commit hooks for python-quality-orb
+# Install: pip install pre-commit && pre-commit install
+# Run manually: pre-commit run --all-files
+
+repos:
+  # General file cleanup hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        name: Fix trailing whitespace
+        exclude: ^tests/
+      - id: end-of-file-fixer
+        name: Ensure files end with newline
+        exclude: ^tests/
+      - id: check-yaml
+        name: Check YAML syntax
+        args: ['--unsafe']  # Allow custom YAML tags
+      - id: check-added-large-files
+        name: Check for large files
+        args: ['--maxkb=500']
+      - id: check-merge-conflict
+        name: Check for merge conflicts
+      - id: mixed-line-ending
+        name: Fix mixed line endings
+        args: ['--fix=lf']
+
+  # YAML linting
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.33.0
+    hooks:
+      - id: yamllint
+        name: Lint YAML files
+        files: ^(src/.*\.yml|\.circleci/.*\.yml|docs/.*\.yml)$
+        args: ['-c', '.yamllint.yaml']
+
+  # Markdown linting
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.38.0
+    hooks:
+      - id: markdownlint
+        name: Lint Markdown files
+        files: ^(README\.md|ARCHITECTURE\.md|CHANGELOG\.md)$
+        args: ['--disable', 'MD013', '--fix']
+
+  # Secret detection
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        name: Detect secrets
+        exclude: ^(tests/|test-integration/)
+        args: ['--baseline', '.secrets.baseline']
+
+  # CircleCI validation (local hooks)
+  - repo: local
+    hooks:
+      - id: circleci-validate
+        name: Validate CircleCI config
+        entry: bash
+        language: system
+        files: ^\.circleci/config\.yml$
+        pass_filenames: false
+        args: ['-c', 'circleci config validate .circleci/config.yml']
+
+      - id: orb-validate
+        name: Validate and pack orb
+        entry: bash
+        language: system
+        files: ^src/.*\.yml$
+        pass_filenames: false
+        args: ['-c', 'circleci orb pack src > orb.yml && circleci orb validate orb.yml']
+
+      - id: check-orb-version
+        name: Check orb version consistency
+        entry: bash
+        language: system
+        files: ^src/@orb\.yml$
+        pass_filenames: false
+        args: ['-c', 'grep -q "version: 2.1" src/@orb.yml || exit 1']

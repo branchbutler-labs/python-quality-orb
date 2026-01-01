@@ -1,18 +1,74 @@
 description: >
-  Run automated pull request review with Danger.
+  Run comprehensive automated pull request review with Danger.
 
-  Analyzes the PR for common issues and provides automated feedback.
+  Analyzes PRs for common issues and provides automated feedback including:
+  - PR description validation
+  - Auto-labeling suggestions
+  - Changelog enforcement
+  - Breaking change detection
+  - Commit message validation
+  - Large file warnings
+  - TODO/FIXME tracking
+  - Security file detection
 
 executor: python
 
 parameters:
-  min-coverage:
+  min-description-length:
     type: integer
-    default: 80
-    description: Minimum test coverage percentage to require
+    default: 50
+    description: Minimum PR description length to require
+
+  max-file-size:
+    type: integer
+    default: 500000
+    description: Maximum file size in bytes before warning
+
+  fail-on-warnings:
+    type: boolean
+    default: false
+    description: Fail the job if Danger reports warnings
+
+  require-changelog:
+    type: boolean
+    default: true
+    description: Require CHANGELOG updates for PRs to main/master
+
+  require-tests:
+    type: boolean
+    default: false
+    description: Require test files when source files change
+
+  auto-label:
+    type: boolean
+    default: true
+    description: Automatically suggest labels based on changed files
+
+  check-commits:
+    type: boolean
+    default: true
+    description: Validate commit message format (conventional commits)
+
+  max-pr-size:
+    type: integer
+    default: 500
+    description: Maximum lines changed before warning about PR size
+
+  protected-branches:
+    type: string
+    default: "main,master"
+    description: Comma-separated list of protected branches requiring extra checks
 
 steps:
   - checkout
 
   - danger:
-      min-coverage: << parameters.min-coverage >>
+      min-description-length: << parameters.min-description-length >>
+      max-file-size: << parameters.max-file-size >>
+      fail-on-warnings: << parameters.fail-on-warnings >>
+      require-changelog: << parameters.require-changelog >>
+      require-tests: << parameters.require-tests >>
+      auto-label: << parameters.auto-label >>
+      check-commits: << parameters.check-commits >>
+      max-pr-size: << parameters.max-pr-size >>
+      protected-branches: << parameters.protected-branches >>

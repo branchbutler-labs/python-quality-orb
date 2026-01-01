@@ -41,10 +41,9 @@ parameters:
     description: Paths to lint (space-separated)
 
 steps:
-  - run:
-      name: Install linters
-      command: |
-        pip install pylint flake8 mypy bandit
+  - install-tools:
+      install-formatters: false
+      install-linters: true
 
   - when:
       condition: << parameters.run-pylint >>
@@ -53,10 +52,23 @@ steps:
             name: Run pylint
             command: |
               echo "Running pylint..."
-              pylint --max-line-length=<< parameters.max-line-length >> \
-                --output-format=colorized \
-                $(find << parameters.paths >> -name "*.py" | grep -v __pycache__ | head -20) || \
-                if [ "<< parameters.fail-on-error >>" = "true" ]; then exit 1; else true; fi
+              # Find all Python files, excluding common patterns
+              PYTHON_FILES=$(find << parameters.paths >> -type f -name "*.py" \
+                -not -path "*/__pycache__/*" \
+                -not -path "*/venv/*" \
+                -not -path "*/.venv/*" \
+                -not -path "*/env/*" \
+                -not -path "*/.eggs/*" \
+                -not -path "*/build/*" \
+                -not -path "*/dist/*")
+
+              if [ -n "$PYTHON_FILES" ]; then
+                echo "$PYTHON_FILES" | xargs pylint --max-line-length=<< parameters.max-line-length >> \
+                  --output-format=colorized || \
+                  if [ "<< parameters.fail-on-error >>" = "true" ]; then exit 1; else true; fi
+              else
+                echo "No Python files found to lint"
+              fi
 
   - when:
       condition: << parameters.run-flake8 >>

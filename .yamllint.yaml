@@ -1,0 +1,70 @@
+# yamllint configuration for python-quality-orb
+# Documentation: https://yamllint.readthedocs.io/
+
+extends: relaxed
+
+rules:
+  # Line length: relaxed to 120 characters
+  line-length:
+    max: 120
+    level: warning
+
+  # Indentation: 2 spaces (CircleCI standard)
+  indentation:
+    spaces: 2
+    indent-sequences: true
+    check-multi-line-strings: false
+
+  # Truthy values: allow yes/no, true/false, on/off
+  truthy:
+    allowed-values: ['true', 'false', 'yes', 'no', 'on', 'off']
+    check-keys: true
+
+  # Document start: not required for orb files
+  document-start:
+    present: false
+
+  # Comments: require space after # and allow standalone comments
+  comments:
+    require-starting-space: true
+    min-spaces-from-content: 2
+
+  # Empty lines: allow reasonable spacing
+  empty-lines:
+    max: 2
+    max-start: 0
+    max-end: 1
+
+  # Brackets: consistent spacing
+  brackets:
+    min-spaces-inside: 0
+    max-spaces-inside: 1
+
+  # Braces: consistent spacing
+  braces:
+    min-spaces-inside: 0
+    max-spaces-inside: 1
+
+  # Commas: space after but not before
+  commas:
+    max-spaces-before: 0
+    min-spaces-after: 1
+    max-spaces-after: 1
+
+  # Colons: space after but not before
+  colons:
+    max-spaces-before: 0
+    max-spaces-after: 1
+
+  # Hyphens: consistent with CircleCI style
+  hyphens:
+    max-spaces-after: 1
+
+  # Key duplicates: error on duplicates
+  key-duplicates: enable
+
+  # Trailing spaces: not allowed
+  trailing-spaces: enable
+
+  # New line at end of file
+  new-line-at-end-of-file: enable

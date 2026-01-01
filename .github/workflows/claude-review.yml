@@ -1,0 +1,139 @@
+name: Claude Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  claude-review:
+    name: Claude Code Review
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v42
+        with:
+          files: |
+            src/**/*.yml
+            .circleci/**/*.yml
+
+      - name: Setup Python
+        if: steps.changed-files.outputs.any_changed == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install CircleCI CLI
+        if: steps.changed-files.outputs.any_changed == 'true'
+        run: |
+          curl -fLSs https://raw.githubusercontent.com/CircleCI-Public/circleci-cli/main/install.sh | bash
+
+      - name: Validate Orb Structure
+        if: steps.changed-files.outputs.any_changed == 'true'
+        id: validate
+        run: |
+          echo "## Orb Validation Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Pack the orb
+          if circleci orb pack src > orb.yml 2>&1; then
+            echo "✅ Orb packed successfully" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Orb pack failed" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+          # Validate the orb
+          if circleci orb validate orb.yml 2>&1; then
+            echo "✅ Orb validation passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Orb validation failed" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+          # Count components
+          COMMANDS=$(grep -c "^  [a-z]" src/commands/*.yml 2>/dev/null | wc -l || echo "0")
+          JOBS=$(ls src/jobs/*.yml 2>/dev/null | wc -l || echo "0")
+          EXECUTORS=$(ls src/executors/*.yml 2>/dev/null | wc -l || echo "0")
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Component Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- Commands: $COMMANDS" >> $GITHUB_STEP_SUMMARY
+          echo "- Jobs: $JOBS" >> $GITHUB_STEP_SUMMARY
+          echo "- Executors: $EXECUTORS" >> $GITHUB_STEP_SUMMARY
+
+      - name: Check for Breaking Changes
+        if: steps.changed-files.outputs.any_changed == 'true'
+        run: |
+          echo "### Breaking Change Analysis" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Check for removed parameters
+          if git diff origin/main --name-only | grep -q "src/"; then
+            REMOVED_PARAMS=$(git diff origin/main -- src/ | grep "^-.*type:" | wc -l || echo "0")
+            if [ "$REMOVED_PARAMS" -gt 0 ]; then
+              echo "⚠️ Potential breaking changes detected: $REMOVED_PARAMS parameter(s) may have been removed" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "✅ No breaking changes detected" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+
+      - name: Post Review Summary
+        if: always() && steps.changed-files.outputs.any_changed == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            // Read the step summary
+            const summary = process.env.GITHUB_STEP_SUMMARY ?
+              fs.readFileSync(process.env.GITHUB_STEP_SUMMARY, 'utf8') :
+              'Review completed.';
+
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(comment =>
+              comment.user.type === 'Bot' &&
+              comment.body.includes('Orb Validation Results')
+            );
+
+            const body = `## 🤖 Automated Code Review
+
+            ${summary}
+
+            ---
+            *Review performed by Claude Code Review workflow*
+            `;
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body
+              });
+            }

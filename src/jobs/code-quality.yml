@@ -27,6 +27,11 @@ parameters:
     default: 100
     description: Maximum line length for formatters and linters
 
+  lint-fail-on-error:
+    type: boolean
+    default: false
+    description: Fail the job if linting errors are found
+
   auto-commit:
     type: boolean
     default: false
@@ -66,7 +71,7 @@ steps:
       steps:
         - lint:
             max-line-length: << parameters.line-length >>
-            fail-on-error: false
+            fail-on-error: << parameters.lint-fail-on-error >>
 
   - save_cache:
       key: pip-v1-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}

@@ -1,0 +1,36 @@
+description: >
+  Install Python quality tools with pinned versions.
+
+  Installs Black, isort, pylint, flake8, mypy, and bandit with specific
+  versions to ensure consistency across environments. Can install all tools
+  or selectively install subsets.
+
+parameters:
+  install-formatters:
+    type: boolean
+    default: true
+    description: Install Black and isort
+
+  install-linters:
+    type: boolean
+    default: true
+    description: Install pylint, flake8, mypy, and bandit
+
+steps:
+  - when:
+      condition: << parameters.install-formatters >>
+      steps:
+        - run:
+            name: Install formatters
+            command: |
+              echo "Installing formatters with pinned versions..."
+              pip install black==24.1.0 isort==5.13.0
+
+  - when:
+      condition: << parameters.install-linters >>
+      steps:
+        - run:
+            name: Install linters
+            command: |
+              echo "Installing linters with pinned versions..."
+              pip install pylint==3.0.0 flake8==7.0.0 mypy==1.8.0 bandit==1.7.0

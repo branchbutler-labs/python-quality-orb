@@ -2,8 +2,8 @@
 
 ## ✅ Refactored to orb-tools Templates Structure
 
-**Version**: v1.0.0 → v1.1.0  
-**Published**: 2026-01-01  
+**Version**: v1.0.0 → v1.1.0
+**Published**: 2026-01-01
 **Status**: Live in CircleCI Registry
 
 ## Before & After Structure
@@ -231,6 +231,6 @@ $ circleci orb publish promote branchbutler-labs/python-quality@dev:refactor min
 
 ---
 
-**Refactoring completed**: 2026-01-01  
-**Version**: v1.1.0  
+**Refactoring completed**: 2026-01-01
+**Version**: v1.1.0
 **Status**: Production Ready ✅

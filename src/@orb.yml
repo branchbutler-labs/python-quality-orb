@@ -8,6 +8,7 @@ description: |
   interactive PR workflows.
 
   Commands:
+    - install-tools: Install pinned versions of quality tools
     - format: Auto-format with Black and isort
     - lint: Comprehensive linting with pylint, flake8, mypy, bandit
     - danger: Automated PR review
@@ -33,6 +34,7 @@ executors:
 
 # Import commands
 commands:
+  install-tools: <<include(commands/install-tools.yml)>>
   format: <<include(commands/format.yml)>>
   lint: <<include(commands/lint.yml)>>
   danger: <<include(commands/danger.yml)>>
@@ -50,7 +52,7 @@ examples:
     usage:
       version: 2.1
       orbs:
-        python-quality: branchbutler-labs/python-quality@1.1.0
+        python-quality: branchbutler-labs/python-quality@1.2.0
       workflows:
         format-code:
           jobs:
@@ -64,12 +66,13 @@ examples:
     usage:
       version: 2.1
       orbs:
-        python-quality: branchbutler-labs/python-quality@1.1.0
+        python-quality: branchbutler-labs/python-quality@1.2.0
       workflows:
         quality-check:
           jobs:
             - python-quality/code-quality:
                 line-length: 100
+                lint-fail-on-error: true
                 auto-commit: false
                 context: branchbutler
 
@@ -78,7 +81,7 @@ examples:
     usage:
       version: 2.1
       orbs:
-        python-quality: branchbutler-labs/python-quality@1.1.0
+        python-quality: branchbutler-labs/python-quality@1.2.0
       workflows:
         pr-workflow:
           jobs:
@@ -95,12 +98,15 @@ examples:
     usage:
       version: 2.1
       orbs:
-        python-quality: branchbutler-labs/python-quality@1.1.0
+        python-quality: branchbutler-labs/python-quality@1.2.0
       jobs:
         my-custom-job:
           executor: python-quality/python
           steps:
             - checkout
+            - python-quality/install-tools:
+                install-formatters: true
+                install-linters: true
             - python-quality/format:
                 line-length: 120
                 auto-commit: true

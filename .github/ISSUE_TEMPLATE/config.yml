@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+contact_links:
+  - name: CircleCI Orb Registry
+    url: https://circleci.com/developer/orbs/orb/branchbutler-labs/python-quality
+    about: View the orb in the CircleCI Orb Registry
+  - name: CircleCI Documentation
+    url: https://circleci.com/docs/orb-intro/
+    about: Learn about CircleCI orbs
+  - name: Branch Butler Website
+    url: https://branchbutler.com
+    about: Visit the Branch Butler website
+  - name: Discussions
+    url: https://github.com/branchbutler-labs/python-quality-orb/discussions
+    about: Ask questions and discuss ideas

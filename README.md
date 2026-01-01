@@ -59,12 +59,14 @@ workflows:
 Format Python code with Black and isort.
 
 **Parameters:**
+
 - `line-length` (integer, default: `100`) - Maximum line length
 - `auto-commit` (boolean, default: `true`) - Auto-commit changes
 - `paths` (string, default: `"."`) - Paths to format
 - `isort-profile` (string, default: `"black"`) - isort profile
 
 **Example:**
+
 ```yaml
 steps:
   - python-quality/format:
@@ -77,6 +79,7 @@ steps:
 Run Python linters and static analysis.
 
 **Parameters:**
+
 - `fail-on-error` (boolean, default: `true`) - Fail on linting errors
 - `run-pylint` (boolean, default: `true`) - Run pylint
 - `run-flake8` (boolean, default: `true`) - Run flake8
@@ -86,6 +89,7 @@ Run Python linters and static analysis.
 - `paths` (string, default: `"."`) - Paths to lint
 
 **Example:**
+
 ```yaml
 steps:
   - python-quality/lint:
@@ -98,15 +102,19 @@ steps:
 Run Danger for automated PR review.
 
 **Parameters:**
+
 - `github-token` (env_var_name, default: `GITHUB_TOKEN`) - GitHub token variable
-- `min-coverage` (integer, default: `80`) - Minimum test coverage
+- `min-description-length` (integer, default: `10`) - Minimum PR description length
+- `max-file-size` (integer, default: `500000`) - Maximum file size in bytes before warning
 - `fail-on-warnings` (boolean, default: `false`) - Fail on warnings
 
 **Example:**
+
 ```yaml
 steps:
   - python-quality/danger:
-      min-coverage: 90
+      min-description-length: 20
+      fail-on-warnings: true
 ```
 
 ### `rebase`
@@ -114,11 +122,13 @@ steps:
 Rebase PR branch onto target branch.
 
 **Parameters:**
+
 - `base-branch` (string, default: `"main"`) - Base branch to rebase onto
 - `auto-resolve-conflicts` (boolean, default: `false`) - Auto-resolve conflicts
 - `force-push` (boolean, default: `true`) - Force push after rebase
 
 **Example:**
+
 ```yaml
 steps:
   - python-quality/rebase:
@@ -133,6 +143,7 @@ steps:
 Run full code quality suite with formatting and linting.
 
 **Parameters:**
+
 - `checkout-code` (boolean, default: `true`) - Checkout repository
 - `run-format` (boolean, default: `true`) - Run formatting
 - `run-lint` (boolean, default: `true`) - Run linting
@@ -140,6 +151,7 @@ Run full code quality suite with formatting and linting.
 - `auto-commit` (boolean, default: `false`) - Auto-commit changes
 
 **Example:**
+
 ```yaml
 jobs:
   - python-quality/code-quality:
@@ -153,13 +165,18 @@ jobs:
 Automated PR review with Danger.
 
 **Parameters:**
-- `min-coverage` (integer, default: `80`) - Minimum test coverage
+
+- `min-description-length` (integer, default: `10`) - Minimum PR description length
+- `max-file-size` (integer, default: `500000`) - Maximum file size in bytes before warning
+- `fail-on-warnings` (boolean, default: `false`) - Fail on warnings
 
 **Example:**
+
 ```yaml
 jobs:
   - python-quality/pr-review:
-      min-coverage: 90
+      min-description-length: 20
+      fail-on-warnings: true
 ```
 
 ## Slash Commands
@@ -167,30 +184,34 @@ jobs:
 Use these commands in PR comments to trigger actions:
 
 ### `/format`
+
 Auto-format code with Black and isort.
 
-```
+```text
 /format
 ```
 
 ### `/lint`
+
 Run comprehensive linting.
 
-```
+```text
 /lint
 ```
 
 ### `/rebase`
+
 Rebase PR branch onto target.
 
-```
+```text
 /rebase
 ```
 
 ### `/danger`
+
 Run automated PR review.
 
-```
+```text
 /danger
 ```
 
@@ -203,10 +224,12 @@ Run automated PR review.
 Python executor with pre-installed tools.
 
 **Parameters:**
+
 - `tag` (string, default: `"3.11"`) - Python version
 - `resource-class` (enum, default: `"medium"`) - Resource class
 
 **Example:**
+
 ```yaml
 executor:
   name: python-quality/python
@@ -321,6 +344,7 @@ workflows:
 ## Requirements
 
 Your repository should have:
+
 - Python project with Python files (`.py`)
 - Optional: `requirements.txt` and/or `requirements-dev.txt`
 - Optional: `.pylintrc`, `.flake8`, `mypy.ini` for custom linter config
@@ -328,14 +352,17 @@ Your repository should have:
 ## Environment Variables
 
 ### Required for PR Features
+
 - `GITHUB_TOKEN` - GitHub personal access token with `repo` scope
 
 ### Optional
+
 - `CIRCLECI_TOKEN` - For slash command integration
 
 ## Development
 
 ### Prerequisites
+
 - CircleCI CLI: `brew install circleci`
 - CircleCI account with orb publishing enabled
 
@@ -366,6 +393,7 @@ circleci orb publish promote branchbutler-labs/python-quality@dev:first patch
 ## Contributing
 
 Contributions welcome! Please:
+
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes with tests
